@@ -1,0 +1,12 @@
+#!/bin/sh
+
+fpc font_parser.pas
+rm *.o
+mkdir -p ../inc/fonts
+for f in *.psf
+do
+    filename=$(basename "$f")
+    extension="${filename##*.}"
+    filename="${filename%.*}"
+    ./font_parser $f > ../src/inc/fonts/$filename\_fontdata.inc
+done
