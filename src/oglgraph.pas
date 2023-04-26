@@ -62,8 +62,6 @@ procedure graphSwapBuffers;
 function graphKeyPressed : boolean;
 function graphReadKey : Word;
 procedure SetDoubleBuffer(Enable : boolean);
-//procedure SetPerspectiveDraw(Enable : boolean);
-//procedure SetPerspectiveAttribute(alphaX, alphaY, alphaZ : Single);
 
 
 implementation
@@ -90,7 +88,7 @@ var
   OnGraphWindowCreation : procedure  = nil;
 
   GraphWindow,ParentWindow : HWnd;
-  // this allows direct drawing to the window
+  { this allows direct drawing to the window }
   bitmapdc : hdc;
   windc : hdc;
 
@@ -144,8 +142,8 @@ begin
          { skip old chars }
   if nexttoread=nextfree then
     begin
-      // special keys are started by #0
-      // so we've to remove two chars
+        { special keys are started by #0 }
+        { so we've to remove two chars }
       if keybuffer[nexttoread]=#0 then
         inccyclic(nexttoread);
       inccyclic(nexttoread);
@@ -366,13 +364,13 @@ begin
                  ReleaseDC(window,dc);
                  oldbitmap := SelectObject(bitmapdc,savedscreen);
                  windc := GetDC(window);
-                 // clear everything
+                 { clear everything }
                  oldpen := SelectObject(bitmapdc,GetStockObject(BLACK_PEN));
                  oldbrush := SelectObject(bitmapdc,GetStockObject(BLACK_BRUSH));
                  Windows.Rectangle(bitmapdc,0,0,maxx,maxy);
                  SelectObject(bitmapdc,oldpen);
                  SelectObject(bitmapdc,oldbrush);
-                 // ... the window too
+                 { ... the window too }
                  oldpen := SelectObject(windc,GetStockObject(BLACK_PEN));
                  oldbrush := SelectObject(windc,GetStockObject(BLACK_BRUSH));
                  Windows.Rectangle(windc,0,0,maxx,maxy);
@@ -587,7 +585,7 @@ procedure ogl_InitModeX;
 var
   event: TXEvent;
   AttribParams: PInteger;
-  //array[0..12] of integer;
+  { array[0..12] of integer; }
   FBConfigs: PGLXFBConfig;
   nelem: integer;
   WM_DELETE_WINDOW: TAtom;
@@ -615,10 +613,10 @@ begin
   AttribParams[1] := GLX_WINDOW_BIT;{GLX_PBUFFER_BIT;}
   AttribParams[2] := GLX_RENDER_TYPE;
   AttribParams[3] := GLX_RGBA_BIT;
-  // Request a double-buffered color buffer with
+  { Request a double-buffered color buffer with }
   AttribParams[4] := GLX_DOUBLEBUFFER;
   AttribParams[5] := 1;
-  // the maximum number of bits per component
+  { the maximum number of bits per component }
   AttribParams[6] := GLX_RED_SIZE;
   AttribParams[7] := 8;
   AttribParams[8] := GLX_GREEN_SIZE;
@@ -658,7 +656,7 @@ begin
         end;
       if myevent._type = ClientMessage then
         begin
-          //writeln('CLOSE WINDOW');
+            { writeln('CLOSE WINDOW'); }
         end;
     end;
 end;
@@ -869,13 +867,9 @@ begin
 end;
 procedure ogl_SetRGBPalette(ColorNum, RedValue, GreenValue, BlueValue: smallint);
 begin
-  //    writeln('SetRGBPalette(ColorNum, RedValue, GreenValue, BlueValue: smallint)');
-  //    writeln(format('ColorNum: %d, RedValue: %d, GreenValue: %d, BlueValue: %d',[ColorNum, RedValue, GreenValue, BlueValue]));
   pal[ColorNum].Red := RedValue;
   pal[ColorNum].Green := GreenValue;
   pal[ColorNum].Blue := BlueValue;
-  //    glColor3f(pal[CurrentColor].Red/255, pal[CurrentColor].Green/255, pal[CurrentColor].Blue/255);
-  //    gl_color:=CurrentColor;
 end;
 
 procedure ogl_GetRGBPalette(ColorNum: smallint; var RedValue, GreenValue, BlueValue: smallint);
@@ -890,11 +884,9 @@ begin
 end;
 procedure ogl_SaveVideoState;
 begin
-  //    writeln('SaveVideoState');
 end;
 procedure ogl_RestoreVideoState;
 begin
-  //    writeln('RestoreVideoState');
 end;
 
 
@@ -1141,7 +1133,6 @@ begin
                   end;
     UserFill:
               begin
-                //writeln('UserFill');
                 PatternLineDefault(X1,X2,Y);
               end;
   end;
@@ -1273,14 +1264,14 @@ begin
                   t := y1;
                   while t<=y2 do
                     begin
-                      // вычисляем крайние точки элипса
+                        { find ellipse edge points }
                       x1 := -abs(XRadius*cos(ArcSin(t/YRadius)));
                       x2 := -x1;
-                      // вычисляем границы внутреннего сектора
+                      { find border of the internal sector }
                       if (EndAngle-stAngle>=180) and
                          (((t<=0) and (ArcCall.YStart-Y>=0) and (ArcCall.YEnd-Y>=0)) or
                          ((t>0) and (ArcCall.YStart-Y<=0) and (ArcCall.YEnd-Y<=0))) then
-                        // Вырез находится в другой половине элипса
+                             { cut is placed in another half of the ellipse }
                         ogl_PatternLineShift(round(x1+X), round(x2+X), round(t+Y), round(XRadius-x1))
                       else
                         begin
@@ -1379,7 +1370,6 @@ end;
 
 procedure ogl_InitMode;
 begin
-  //    writeln('InitMode');
   if graphInited then
     _graphResult := grError
   else
@@ -1421,12 +1411,7 @@ begin
       GetRGBPalette  := @ogl_GetRGBPalette;
       SetAllPalette  := @ogl_SetAllPalette;
             { defaults possible ... }
-      //        SetVisualPage  : SetVisualPageProc;
-      //        SetActivePage  : SetActivePageProc;
       ClearViewPort  := @ogl_ClrView;
-      //        PutImage       : PutImageProc;
-      //        GetImage       : GetImageProc;
-      //        ImageSize      : ImageSizeProc;
       GetScanLine    := @ogl_GetScanLine;
       Line           := @ogl_Line;
       InternalEllipse := @ogl_Ellipse;
@@ -1636,7 +1621,6 @@ end;
 
 procedure CloseGraph;
 begin
-  //    writeln('CloseGraph');
   if graphInited then
     begin
         {$IFDEF WIN32}
