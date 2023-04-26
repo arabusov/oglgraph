@@ -14,7 +14,7 @@
  **********************************************************************}
 
 var
-  ExitSave: pointer;
+  ExitSave: codepointer;
 
 const
   firstCallOfInitGraph: boolean = true;
@@ -47,11 +47,15 @@ const
    StdBufferSize = 4096;   { Buffer size for FloodFill }
 
 type
-  tinttable = array[0..16383] of smallint;
+  tinttable = array[0..16382] of smallint;
   pinttable = ^tinttable;
 
   WordArray = Array [0..StdbufferSize] Of word;
   PWordArray = ^WordArray;
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  LongWordArray = Array [0..StdbufferSize] Of LongWord;
+  PLongWordArray = ^LongWordArray;
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
 
 
 const
@@ -73,19 +77,13 @@ const
 
 
   { Default font 8x8 system from IBM PC }
-  { $i fontdata.inc}
+  {$i fontdata.inc}
 
-  { 866 encoded default font }
-  { $i 866_8x8_fontdata.inc}
-  {$i UniCyr_8x8_fontdata.inc}
-  { $i UniCyr-pln-8x8_fontdata.inc}
-  { $i UniCyrX-pln-8x8_fontdata.inc}
-  { $i Cyr_a8x8_fontdata.inc} // without YE
 
 
 var
-  CurrentColor:     Word;
-  CurrentBkColor: Word;
+  CurrentColor:     ColorType;
+  CurrentBkColor: ColorType;
   CurrentX : smallint;   { viewport relative }
   CurrentY : smallint;   { viewport relative }
 
@@ -104,7 +102,7 @@ var
   { information for Text Output routines }
   CurrentTextInfo : TextSettingsType;
   CurrentXRatio, CurrentYRatio: graph_float;
-  installedfonts: longint;  { Number of installed fonts }
+  installedfonts: smallint;  { Number of installed fonts }
 
 
   StartXViewPort: smallint; { absolute }
@@ -118,6 +116,20 @@ var
 
   ArcCall: ArcCoordsType;   { Information on the last call to Arc or Ellipse }
 
+
+type
+  PNewModelist = ^TNewModeList;
+  TNewModeList = record
+    Mode: PModeInfo;
+    next: PNewModeList;
+    internModeNumber: smallint;
+  end;
+  TNewModeInfo = record
+    modeInfo: array[lowNewDriver..highNewDriver] of PNewModeList;
+    loHiModeNr: array[lowNewDriver..highNewDriver] of record
+      lo,hi: smallint;
+    end;
+  end;
 
 var
 
@@ -142,9 +154,6 @@ var
 
 
 
-  procedure DrawFlushDefault;
-    begin
-    end;  
 
 {--------------------------------------------------------------------------}
 {                                                                          }
@@ -232,7 +241,7 @@ var
       Flag           : Boolean; { determines pixel direction in thick lines }
       NumPixels      : smallint;
       PixelCount     : smallint;
-      OldCurrentColor: Word;
+      OldCurrentColor: ColorType;
       swtmp          : smallint;
       TmpNumPixels   : smallint;
  begin
@@ -256,7 +265,7 @@ var
                { thick width }
                hline(x1,x2,y2-1);
                hline(x1,x2,y2);
-               hline(x2,x2,y2+1);
+               hline(x1,x2,y2+1);
             end;
         end
     else
@@ -475,7 +484,7 @@ var
                     { with predefined line patterns...                 }
                     if LinePatterns[PixelCount and 15] = TRUE then
                       begin
-                    DirectPutPixel(x1,PixelCount);
+                        DirectPutPixel(x1,PixelCount);
                       end;
               end
             else
@@ -599,7 +608,7 @@ var
              begin
                   if LinePatterns[i and 15] = TRUE then
                     begin
-                          DirectPutPixel(x,y);
+                      DirectPutPixel(x,y);
                     end;
              if d < 0 then
                  begin
@@ -668,7 +677,9 @@ var
     TempTerm: graph_float;
     xtemp, ytemp, xp, yp, xm, ym, xnext, ynext,
       plxpyp, plxmyp, plxpym, plxmym: smallint;
-    BackupColor, TmpAngle, OldLineWidth: word;
+    BackupColor: ColorType;
+    TmpAngle, OldLineWidth: word;
+    CounterClockwise : Boolean;
   Begin
    If LineInfo.ThickNess = ThickWidth Then
     { first draw the two outer ellipses using normwidth and no filling (JM) }
@@ -713,7 +724,10 @@ var
        TmpAngle:=EndAngle;
        EndAngle:=StAngle;
        Stangle:=TmpAngle;
-     end;
+       CounterClockwise:=true;
+     end
+   else
+     CounterClockwise:=false;
    { approximate the number of pixels required by using the circumference }
    { equation of an ellipse.                                              }
    { Changed this formula a it (trial and error), but the net result is that }
@@ -760,22 +774,22 @@ var
      plxmyp := -maxsmallint-1;
      plxpym := maxsmallint;
      plxmym := -maxsmallint-1;
-     If (j >= StAngle) and (j <= EndAngle) then
+     If ((j >= StAngle) and (j <= EndAngle)) xor CounterClockwise then
        begin
          plxpyp := xp;
          PutPixel(xp,yp,CurrentColor);
        end;
-     If ((180-j) >= StAngle) and ((180-j) <= EndAngle) then
+     If (((180-j) >= StAngle) and ((180-j) <= EndAngle)) xor CounterClockwise then
        begin
          plxmyp := xm;
          PutPixel(xm,yp,CurrentColor);
        end;
-     If ((j+180) >= StAngle) and ((j+180) <= EndAngle) then
+     If (((j+180) >= StAngle) and ((j+180) <= EndAngle)) xor CounterClockwise then
        begin
          plxmym := xm;
          PutPixel(xm,ym,CurrentColor);
        end;
-     If ((360-j) >= StAngle) and ((360-j) <= EndAngle) then
+     If (((360-j) >= StAngle) and ((360-j) <= EndAngle)) xor CounterClockwise then
        begin
          plxpym := xp;
          PutPixel(xp,ym,CurrentColor);
@@ -808,7 +822,7 @@ var
     j           : smallint;
     TmpFillPattern : byte;
     OldWriteMode : word;
-    OldCurrentColor : word;
+    OldCurrentColor : ColorType;
    begin
      { convert to global coordinates ... }
      x1 := x1 + StartXViewPort;
@@ -837,10 +851,13 @@ var
            HLine(x1-StartXViewPort,x2-StartXViewPort,y-StartYViewPort);
            CurrentColor := OldCurrentColor;
          end;
-       $ff:
-         begin
-           HLine(x1-StartXViewPort,x2-StartXViewPort,y-StartYViewPort);
-         end;
+      $ff:
+        begin
+          OldCurrentColor := CurrentColor;
+          CurrentColor := FillSettings.Color;
+          HLine(x1-StartXViewPort,x2-StartXViewPort,y-StartYViewPort);
+          CurrentColor := OldCurrentColor;
+        end;
        else
          begin
            { number of times to go throuh the 8x8 pattern }
@@ -849,24 +866,29 @@ var
              Begin
                for j:=0 to 7 do
                     Begin
-                            { x1 mod 8 }
+                    { x1 mod 8 }
                     if RevBitArray[x1 and 7] and TmpFillPattern <> 0 then
-                       DirectPutpixel(x1,y)
+                      begin
+                        OldCurrentColor := CurrentColor;
+                        CurrentColor := FillSettings.Color;
+                        DirectPutpixel(x1,y);
+                        CurrentColor := OldCurrentColor;
+                      end
                     else
                       begin
-                            { According to the TP graph manual, we overwrite everything }
-                            { which is filled up - checked against VGA and CGA drivers  }
-                            { of TP.                                                    }
-                            OldCurrentColor := CurrentColor;
-                            CurrentColor := CurrentBkColor;
-                            DirectPutPixel(x1,y);
-                            CurrentColor := OldCurrentColor;
+                        { According to the TP graph manual, we overwrite everything }
+                        { which is filled up - checked against VGA and CGA drivers  }
+                        { of TP.                                                    }
+                        OldCurrentColor := CurrentColor;
+                        CurrentColor := CurrentBkColor;
+                        DirectPutPixel(x1,y);
+                        CurrentColor := OldCurrentColor;
                       end;
                     Inc(x1);
                     if x1 > x2 then
                      begin
-                           CurrentWriteMode := OldWriteMode;
-                           exit;
+                       CurrentWriteMode := OldWriteMode;
+                       exit;
                      end;
                    end;
              end;
@@ -874,8 +896,6 @@ var
      End;
      CurrentWriteMode := OldWriteMode;
    end;
-
-
 
 
   procedure LineRel(Dx, Dy: smallint);
@@ -899,14 +919,26 @@ var
 
 
   procedure Rectangle(x1,y1,x2,y2:smallint);
-
+   var
+     tmp: smallint;
    begin
+     if x1 > x2 then
+     begin
+       tmp := x1;
+       x1 := x2;
+       x2 := tmp;
+     end;
+     if y1 > y2 then
+     begin
+       tmp := y1;
+       y1 := y2;
+       y2 := tmp;
+     end;
      { Do not draw the end points }
      Line(x1,y1,x2-1,y1);
      Line(x1,y1+1,x1,y2);
      Line(x2,y1,x2,y2-1);
      Line(x1+1,y2,x2,y2);
-     DrawFlush;
    end;
 
 
@@ -964,7 +996,8 @@ var
 Procedure ClearViewPortDefault; {$ifndef fpc}far;{$endif fpc}
 var
  j: smallint;
- OldWriteMode, OldCurColor: word;
+ OldWriteMode: word;
+ OldCurColor: ColorType;
  LineSets : LineSettingsType;
 Begin
   { CP is always RELATIVE coordinates }
@@ -1086,26 +1119,48 @@ end;
   Var
     x : smallint;
   Begin
-     For x:=X1 to X2 Do
-       WordArray(Data)[x-x1]:=GetPixel(x, y);
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+    if MaxColor > 65536 then
+    begin
+      For x:=X1 to X2 Do
+        LongWordArray(Data)[x-x1]:=GetPixel(x, y);
+    end
+    else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+    begin
+      For x:=X1 to X2 Do
+        WordArray(Data)[x-x1]:=GetPixel(x, y);
+    end;
   End;
 
 
 
 Function DefaultImageSize(X1,Y1,X2,Y2: smallint): longint; {$ifndef fpc}far;{$endif fpc}
 Begin
-  { each pixel uses two bytes, to enable modes with colors up to 64K }
-  { to work.                                                         }
-  DefaultImageSize := 12 + (((X2-X1+1)*(Y2-Y1+1))*2);
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  if MaxColor > 65536 then
+  begin
+    DefaultImageSize := 12 + (((X2-X1+1)*(Y2-Y1+1))*4);
+  end
+  else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  begin
+    { each pixel uses two bytes, to enable modes with colors up to 64K }
+    { to work.                                                         }
+    DefaultImageSize := 12 + (((X2-X1+1)*(Y2-Y1+1))*2);
+  end;
 end;
 
 Procedure DefaultPutImage(X,Y: smallint; var Bitmap; BitBlt: Word); {$ifndef fpc}far;{$endif fpc}
 type
-  pt = array[0..$fffffff] of word;
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  ptl = array[0..{$ifdef cpu16}8191{$else}$fffffff{$endif}] of longword;
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  pt = array[0..{$ifdef cpu16}16382{$else}$fffffff{$endif}] of word;
   ptw = array[0..2] of longint;
 var
   k: longint;
-  oldCurrentColor: word;
+  oldCurrentColor: ColorType;
   oldCurrentWriteMode, i, j, y1, x1, deltaX, deltaX1, deltaY: smallint;
 Begin
 {$ifdef logging}
@@ -1121,7 +1176,12 @@ Begin
 
   deltaX := 0;
   deltaX1 := 0;
-  k := 3 * sizeOf(Longint) div sizeOf(Word); { Three reserved longs at start of bitmap }
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  if MaxColor > 65536 then
+    k := 3 * sizeOf(Longint) div sizeOf(LongWord) { Three reserved longs at start of bitmap }
+  else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+    k := 3 * sizeOf(Longint) div sizeOf(Word); { Three reserved longs at start of bitmap }
  { check which part of the image is in the viewport }
   if clipPixels then
     begin
@@ -1150,39 +1210,75 @@ Begin
   oldCurrentColor := currentColor;
   oldCurrentWriteMode := currentWriteMode;
   currentWriteMode := bitBlt;
-  for j:=Y to Y1 do
-   Begin
-     inc(k,deltaX);
-     for i:=X to X1 do
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  if MaxColor > 65536 then
+  begin
+    for j:=Y to Y1 do
+    Begin
+      inc(k,deltaX);
+      for i:=X to X1 do
+      begin
+        currentColor := ptl(bitmap)[k];
+        directPutPixel(i,j);
+        inc(k);
+      end;
+      inc(k,deltaX1);
+    end;
+  end
+  else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  begin
+    for j:=Y to Y1 do
+    Begin
+      inc(k,deltaX);
+      for i:=X to X1 do
       begin
         currentColor := pt(bitmap)[k];
         directPutPixel(i,j);
         inc(k);
-     end;
-     inc(k,deltaX1);
-   end;
+      end;
+      inc(k,deltaX1);
+    end;
+  end;
   currentWriteMode := oldCurrentWriteMode;
   currentColor := oldCurrentColor;
 end;
 
 Procedure DefaultGetImage(X1,Y1,X2,Y2: smallint; Var Bitmap); {$ifndef fpc}far;{$endif fpc}
 type
-  pt = array[0..$fffffff] of word;
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  ptl = array[0..{$ifdef cpu16}8191{$else}$fffffff{$endif}] of longword;
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  pt = array[0..{$ifdef cpu16}16382{$else}$fffffff{$endif}] of word;
   ptw = array[0..2] of longint;
 var
   i,j: smallint;
   k: longint;
 Begin
-  k:= 3 * Sizeof(longint) div sizeof(word); { Three reserved longs at start of bitmap }
   i := x2 - x1 + 1;
-  for j:=Y1 to Y2 do
-   Begin
-     GetScanLine(x1,x2,j,pt(Bitmap)[k]);
-     inc(k,i);
-   end;
-   ptw(Bitmap)[0] := X2-X1+1;   { First longint  is width  }
-   ptw(Bitmap)[1] := Y2-Y1+1;   { Second longint is height }
-   ptw(bitmap)[2] := 0;       { Third longint is reserved}
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  if MaxColor > 65536 then
+  begin
+    k:= 3 * Sizeof(longint) div sizeof(longword); { Three reserved longs at start of bitmap }
+    for j:=Y1 to Y2 do
+    Begin
+      GetScanLine(x1,x2,j,ptl(Bitmap)[k]);
+      inc(k,i);
+    end;
+  end
+  else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  begin
+    k:= 3 * Sizeof(longint) div sizeof(word); { Three reserved longs at start of bitmap }
+    for j:=Y1 to Y2 do
+    Begin
+      GetScanLine(x1,x2,j,pt(Bitmap)[k]);
+      inc(k,i);
+    end;
+  end;
+  ptw(Bitmap)[0] := X2-X1+1;   { First longint  is width  }
+  ptw(Bitmap)[1] := Y2-Y1+1;   { Second longint is height }
+  ptw(bitmap)[2] := 0;       { Third longint is reserved}
 end;
 
 
@@ -1210,41 +1306,43 @@ end;
    begin
    end;
 
-  procedure DirectPutPixelDefault(X,Y: smallint);
+  procedure NotInGraphicsMode; noreturn;
    begin
      Writeln(stderr,'Error: Not in graphics mode (use InitGraph and test GraphResult afterwards)');
      Halt(1);
    end;
 
-  function GetPixelDefault(X,Y: smallint): word;
+  procedure DirectPutPixelDefault(X,Y: smallint); noreturn;
    begin
-     Writeln(stderr,'Error: Not in graphics mode (use InitGraph and test GraphResult afterwards)');
-     Halt(1);
-     exit(0); { avoid warning }
+     NotInGraphicsMode;
    end;
 
-  procedure PutPixelDefault(X,Y: smallint; Color: Word);
+  function GetPixelDefault(X,Y: smallint): ColorType; noreturn;
    begin
-     Writeln(stderr,'Error: Not in graphics mode (use InitGraph and test GraphResult afterwards)');
-     Halt(1);
+     NotInGraphicsMode;
    end;
 
-  procedure SetRGBPaletteDefault(ColorNum, RedValue, GreenValue, BlueValue: smallint);
+  procedure PutPixelDefault(X,Y: smallint; Color: ColorType); noreturn;
    begin
-     Writeln(stderr,'Error: Not in graphics mode (use InitGraph and test GraphResult afterwards)');
-     Halt(1);
+     NotInGraphicsMode;
+   end;
+
+  procedure SetRGBPaletteDefault(ColorNum, RedValue, GreenValue, BlueValue: smallint); noreturn;
+   begin
+     NotInGraphicsMode;
    end;
 
   procedure GetRGBPaletteDefault(ColorNum: smallint; var
-            RedValue, GreenValue, BlueValue: smallint);
+            RedValue, GreenValue, BlueValue: smallint); noreturn;
    begin
-     Writeln(stderr,'Error: Not in graphics mode (use InitGraph and test GraphResult afterwards)');
-     Halt(1);
+     NotInGraphicsMode;
    end;
 
 
   procedure OutTextXYDefault(x,y : smallint;const TextString : string);forward;
   procedure CircleDefault(X, Y: smallint; Radius:Word);forward;
+  procedure SetBkColorDefault(ColorNum: ColorType);forward;
+  function GetBkColorDefault: ColorType;forward;
 
 {$i palette.inc}
 
@@ -1283,7 +1381,8 @@ end;
     VLine := {$ifdef fpc}@{$endif}VLineDefault;
     OuttextXY := {$ifdef fpc}@{$endif}OuttextXYDefault;
     Circle := {$ifdef fpc}@{$endif}CircleDefault;
-    DrawFlush := {$ifdef fpc}@{$endif}DrawFlushDefault;
+    SetBkColor := {$ifdef fpc}@{$endif}SetBkColorDefault;
+    GetBkColor := {$ifdef fpc}@{$endif}GetBkColorDefault;
   end;
 
   Procedure InitVars;
@@ -1348,7 +1447,7 @@ end;
 {     OldWriteMode := CurrentWriteMode;
      if (LineInfo.Thickness = NormWidth) then
        CurrentWriteMode := NormalPut;}
-     InternalEllipse(X,Y,Radius,Radius,StAngle,Endangle,{$ifdef fpc}@{$endif}DummyPatternLine);
+     InternalEllipse(X,Y,Radius,(longint(Radius)*XAspect) div YAspect,StAngle,Endangle,{$ifdef fpc}@{$endif}DummyPatternLine);
 {     CurrentWriteMode := OldWriteMode;}
    end;
 
@@ -1492,7 +1591,18 @@ end;
  end;
 
  procedure Sector(x, y: smallint; StAngle,EndAngle, XRadius, YRadius: Word);
+  var
+    TmpAngle : Word;
   begin
+     { sector does not draw counter-clock wise }
+     StAngle := StAngle mod 361;
+     EndAngle := EndAngle mod 361;
+     if Endangle < StAngle then
+       Begin
+         TmpAngle:=EndAngle;
+         EndAngle:=StAngle;
+         StAngle:=TmpAngle;
+       end;
      internalellipse(x,y,XRadius, YRadius, StAngle, EndAngle, {$ifdef fpc}@{$endif}SectorPL);
      Line(ArcCall.XStart, ArcCall.YStart, x,y);
      Line(x,y,ArcCall.Xend,ArcCall.YEnd);
@@ -1500,7 +1610,7 @@ end;
 
 
 
-   procedure SetFillStyle(Pattern : word; Color: word);
+   procedure SetFillStyle(Pattern : word; Color: ColorType);
 
    begin
      { on invalid input, the current fill setting will be }
@@ -1518,7 +1628,7 @@ end;
    end;
 
 
-  procedure SetFillPattern(Pattern: FillPatternType; Color: word);
+  procedure SetFillPattern(Pattern: FillPatternType; Color: ColorType);
   {********************************************************}
   { Changes the Current FillPattern to a user defined      }
   { pattern and changes also the current fill color.       }
@@ -1554,7 +1664,7 @@ end;
   {     - No contour is drawn for the lines                }
   {********************************************************}
   var y               : smallint;
-      origcolor       : longint;
+      origcolor       : ColorType;
       origlinesettings: Linesettingstype;
       origwritemode   : smallint;
    begin
@@ -1565,6 +1675,12 @@ end;
           y:=y1;
           y1:=y2;
           y2:=y;
+       end;
+     if x1>x2 then
+       begin
+          y:=x1;
+          x1:=x2;
+          x2:=y;
        end;
 
      { Always copy mode for Bars }
@@ -1598,7 +1714,6 @@ end;
     CurrentColor:= Origcolor;
     LineInfo := OrigLineSettings;
     CurrentWriteMode := OrigWritemode;
-    DrawFlush;
    end;
 
 
@@ -1609,6 +1724,19 @@ var
  origwritemode : smallint;
  OldX, OldY : smallint;
 begin
+  if x1 > x2 then
+  begin
+    OldX := x1;
+    x1 := x2;
+    x2 := OldX;
+  end;
+  if y1 > y2 then
+  begin
+    OldY := y1;
+    y1 := y2;
+    y2 := OldY;
+  end;
+
   origwritemode := CurrentWriteMode;
   CurrentWriteMode := CopyPut;
   Bar(x1,y1,x2,y2);
@@ -1647,27 +1775,27 @@ end;
 {--------------------------------------------------------------------------}
 
 
-  procedure SetColor(Color: Word);
+  procedure SetColor(Color: ColorType);
 
    Begin
      CurrentColor := Color;
    end;
 
 
-  function GetColor: Word;
+  function GetColor: ColorType;
 
    Begin
      GetColor := CurrentColor;
    end;
 
-  function GetBkColor: Word;
+  function GetBkColorDefault: ColorType;
 
    Begin
-     GetBkColor := CurrentBkColor;
+     GetBkColorDefault := CurrentBkColor;
    end;
 
 
-  procedure SetBkColor(ColorNum: Word);
+  procedure SetBkColorDefault(ColorNum: ColorType);
   { Background color means background screen color in this case, and it is  }
   { INDEPENDANT of the viewport settings, so we must clear the whole screen }
   { with the color.                                                         }
@@ -1693,7 +1821,7 @@ end;
    end;
 
 
-  function GetMaxColor: word;
+  function GetMaxColor: ColorType;
   { Checked against TP VGA driver - CEC }
 
    begin
@@ -1835,7 +1963,8 @@ end;
      CurrentTextInfo.horiz:=LeftText;
      CurrentTextInfo.vert:=TopText;
 
-     XAspect:=10000; YAspect:=10000;
+     {fix by nickysn: TP7 doesn't reset aspect ratio in GraphDefaults }
+     {XAspect:=10000; YAspect:=10000;}
    end;
 
 
@@ -1862,6 +1991,13 @@ end;
    end;
 
 
+  procedure SetWriteModeEx(WriteMode : smallint);
+   begin
+     if (WriteMode >= CopyPut) and (WriteMode <= NotPut) then
+       CurrentWriteMode := WriteMode;
+   end;
+
+
   procedure GetFillSettings(var Fillinfo:Fillsettingstype);
    begin
      Fillinfo:=Fillsettings;
@@ -1875,26 +2011,49 @@ end;
   procedure DrawPoly(numpoints : word;var polypoints);
     type
       ppointtype = ^pointtype;
-      pt = array[0..16000] of pointtype;
+      pt = array[0..8190] of pointtype;
     var
-      i : longint;
+      i, j, LastPolygonStart: longint;
+      Closing: boolean;
     begin
       if numpoints < 2 then
         begin
-          _GraphResult := grError;
+          { nickysn: TP7 doesn't return error here }
+          {_GraphResult := grError;}
           exit;
         end;
+      Closing := false;
+      LastPolygonStart := 0;
       for i:=0 to numpoints-2 do
-        line(pt(polypoints)[i].x,
-             pt(polypoints)[i].y,
-             pt(polypoints)[i+1].x,
-             pt(polypoints)[i+1].y);
+      begin
+        { skip an edge after each 'closing' edge }
+        if not Closing then
+          line(pt(polypoints)[i].x,
+               pt(polypoints)[i].y,
+               pt(polypoints)[i+1].x,
+               pt(polypoints)[i+1].y);
+
+        { check if the current edge is 'closing'. This means that it 'closes'
+          the polygon by going back to the first point of the polygon.
+          Also, 0-length edges are never considered 'closing'. }
+        if ((pt(polypoints)[i+1].x <> pt(polypoints)[i].x) or
+            (pt(polypoints)[i+1].y <> pt(polypoints)[i].y)) and
+            (LastPolygonStart < i) and
+           ((pt(polypoints)[i+1].x = pt(polypoints)[LastPolygonStart].x) and
+            (pt(polypoints)[i+1].y = pt(polypoints)[LastPolygonStart].y)) then
+        begin
+          Closing := true;
+          LastPolygonStart := i + 2;
+        end
+        else
+          Closing := false;
+      end;
     end;
 
 
   procedure PieSlice(X,Y,stangle,endAngle:smallint;Radius: Word);
   begin
-    Sector(x,y,stangle,endangle,radius,radius);
+    Sector(x,y,stangle,endangle,radius,(longint(Radius)*XAspect) div YAspect);
   end;
 
 {$i fills.inc}
@@ -2049,7 +2208,9 @@ end;
   var
     list: PModeInfo;
     tmp : PModeInfo;
-    c: longint;
+    newList: PNewModeList;
+    newTmp : PNewModeList;
+    c: smallint;
   begin
    { restore old exitproc! }
    exitproc := exitsave;
@@ -2070,12 +2231,12 @@ end;
      end;
    for c := lowNewDriver to highNewDriver do
      begin
-       list := newModeList.modeinfo[c];
-       while assigned(list) do
+       newList := newModeList.modeinfo[c];
+       while assigned(newList) do
          begin
-           tmp := list;
-           list:=list^.next;
-           dispose(tmp);
+           newTmp := newList;
+           newList:=newList^.next;
+           dispose(newTmp);
          end;
      end;
 {$IFDEF DPMI}

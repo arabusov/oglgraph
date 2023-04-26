@@ -806,10 +806,6 @@ begin
     end;
   GetPaletteEntry := index;
 end;
-procedure ogl_DrawFlush;
-begin
-  if not Doublebuffer then glFlush;
-end;
 
 procedure ogl_DirectPutPixel(X,Y: smallint);
 begin
@@ -931,7 +927,6 @@ begin
   glEnable(GL_LOGIC_OP);
   glEnable  (GL_LINE_STIPPLE);
 
-  DrawFlush;
 end;
 
 procedure ogl_Line(X1, Y1, X2, Y2 : smallint);
@@ -954,7 +949,6 @@ begin
   glVertex2i(X1, MaxY-Y1);
   glVertex2i(X2, MaxY-Y2);
   glEnd();
-  DrawFlush;
 end;
 procedure ogl_HLine(x, x2,y : smallint);
 begin
@@ -1334,7 +1328,6 @@ begin
   t := EndAngle*PI/180;
   glVertex2f(XRadius * cos(t) + X, YRadius * sin(t) + MaxY - Y);
   glEnd();
-  DrawFlush;
 
 end;
 
@@ -1356,7 +1349,6 @@ begin
       t := t+ PI/n
     end;
   glEnd();
-  DrawFlush;
 end;
 
 procedure ogl_OutTextXY(X, Y: smallint; const text : string);
@@ -1383,7 +1375,6 @@ begin
   DoubleBuffer := true;
   DefaultPutImage(X, Y, Bitmap, BitBlt);
   DoubleBuffer := oldDoubleBuffer;
-  DrawFlush;
 end;
 
 procedure ogl_InitMode;
@@ -1446,7 +1437,6 @@ begin
 
       InitMode       := @ogl_InitMode;
       OutTextXY      := @ogl_OutTextXY;
-      DrawFlush      := @ogl_DrawFlush;
     end;
 end;{DefaultModeParams}
 

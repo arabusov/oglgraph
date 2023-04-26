@@ -186,10 +186,12 @@
 
 
 type
+{$ifndef fpc}
     smallint = -32768..32767;
+{$endif}
 
     TResolutionRec = record
-      x,y: longint;
+      x,y: {$ifdef cpu16}smallint{$else}longint{$endif};
     end;
 
     const
@@ -319,7 +321,12 @@ type
        { graphic drivers }
        CurrentDriver = -128;
        Detect        = 0;
-       LowRes        = 1;
+       CGA           = 1;
+       MCGA          = 2;
+       EGA           = 3;
+       EGA64         = 4;
+       EGAMono       = 5;
+       LowRes        = 6; { nickysn: used to be 1, but moved to 6, because I added CGA }
        HercMono      = 7;
        VGA           = 9;
        VESA          = 10;
@@ -344,6 +351,32 @@ type
        { graph modes }
        Default = 0;
 
+       { CGA Driver modes }
+       CGAC0 = 0;
+       CGAC1 = 1;
+       CGAC2 = 2;
+       CGAC3 = 3;
+       CGAHi = 4;
+
+       { MCGA Driver modes }
+       MCGAC0 = 0;
+       MCGAC1 = 1;
+       MCGAC2 = 2;
+       MCGAC3 = 3;
+       MCGAMed = 4;
+       MCGAHi = 5;
+
+       { EGA Driver modes }
+       EGALo      = 0;  { 640x200 16 color 4 page }
+       EGAHi      = 1;  { 640x350 16 color 2 page }
+
+       { EGA64 Driver modes }
+       EGA64Lo    = 0;  { 640x200 16 color 1 page }
+       EGA64Hi    = 1;  { 640x350 4 color  1 page }
+
+       { EGAMono Driver modes }
+       EGAMonoHi  = 3;  { 640x350 64K on card, 1 page; 256K on card, 2 page }
+
        { VGA Driver modes }
        VGALo   = 0;
        VGAMed  = 1;
@@ -355,25 +388,25 @@ type
        { consecutive mode number for that, so they are generated on-the-fly }
        { starting from 1)                                                   }
 
-       detectMode = 30000;
-       m320x200 = 30001;
-       m320x256 = 30002; { amiga resolution (PAL) }
-       m320x400 = 30003; { amiga/atari resolution }
-       m512x384 = 30004; { mac resolution }
-       m640x200 = 30005; { vga resolution }
-       m640x256 = 30006; { amiga resolution (PAL) }
-       m640x350 = 30007; { vga resolution }
-       m640x400 = 30008;
-       m640x480 = 30009;
-       m800x600 = 30010;
-       m832x624 = 30011; { mac resolution }
-       m1024x768 = 30012;
-       m1280x1024 = 30013;
-       m1600x1200 = 30014;
-       m2048x1536 = 30015;
+       detectMode = {$ifdef cpu16}3000{$else}30000{$endif};
+       m320x200   = detectMode +  1;
+       m320x256   = detectMode +  2; { amiga resolution (PAL) }
+       m320x400   = detectMode +  3; { amiga/atari resolution }
+       m512x384   = detectMode +  4; { mac resolution }
+       m640x200   = detectMode +  5; { vga resolution }
+       m640x256   = detectMode +  6; { amiga resolution (PAL) }
+       m640x350   = detectMode +  7; { vga resolution }
+       m640x400   = detectMode +  8;
+       m640x480   = detectMode +  9;
+       m800x600   = detectMode + 10;
+       m832x624   = detectMode + 11; { mac resolution }
+       m1024x768  = detectMode + 12;
+       m1280x1024 = detectMode + 13;
+       m1600x1200 = detectMode + 14;
+       m2048x1536 = detectMode + 15;
 
-       lowNewMode = 30001;
-       highNewMode = 30015;
+       lowNewMode = m320x200;
+       highNewMode = m2048x1536;
 
        resolutions: array[lowNewMode..highNewMode] of TResolutionRec =
        ((x:320;y:200),
@@ -401,6 +434,12 @@ type
 
 
     type
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       ColorType = LongWord;
+{$else FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       ColorType = Word;
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+
        RGBRec = packed record
          Red: smallint;
          Green: smallint;
@@ -428,7 +467,7 @@ type
 
        FillSettingsType = record
              pattern : word;
-             color : word;
+             color : ColorType;
        end;
 
        FillPatternType = array[1..8] of byte;
@@ -485,8 +524,8 @@ TYPE
        defpixelproc = procedure(X,Y: smallint);
 
        { standard plot and get pixel                                }
-       getpixelproc = function(X,Y: smallint): word;
-       putpixelproc = procedure(X,Y: smallint; Color: Word);
+       getpixelproc = function(X,Y: smallint): ColorType;
+       putpixelproc = procedure(X,Y: smallint; Color: ColorType);
 
        { clears the viewport, also used to clear the device         }
        clrviewproc  = procedure;
@@ -556,7 +595,9 @@ TYPE
 
        CircleProc = procedure(X, Y: smallint; Radius:Word);
 
-       FlushProc = procedure();
+       SetBkColorProc = procedure(ColorNum: ColorType);
+       GetBkColorProc = function: ColorType;
+
 
 TYPE
     {-----------------------------------}
@@ -583,7 +624,7 @@ TYPE
       MaxY: word;                { Max. column.                    }
       DirectColor: boolean;         { Is this a direct color mode??   }
       Hardwarepages: byte;          { total number of image pages - 1 }
-      ModeName: String[18];
+      ModeName: String[32];
       { necessary hooks ... }
       DirectPutPixel : DefPixelProc;
       GetPixel       : GetPixelProc;
@@ -607,15 +648,9 @@ TYPE
       Circle         : CircleProc;
       InitMode       : InitModeProc;
       OutTextXY : OutTextXYProc;
-      DrawFlush : FlushProc;
+      SetBKColor     : SetBkColorProc;
+      GetBKColor     : GetBkColorProc;
       next: PModeInfo;
-    end;
-
-    TNewModeInfo = record
-      modeInfo: array[lowNewDriver..highNewDriver] of PModeInfo;
-      loHiModeNr: array[lowNewDriver..highNewDriver] of record
-        lo,hi: smallint;
-      end;
     end;
 
 
@@ -634,6 +669,8 @@ VAR
   GetRGBPalette  : GetRGBPaletteProc;
   SetAllPalette  : SetAllPaletteProc;
   OutTextXY      : OutTextXYProc;
+  SetBkColor     : SetBkColorProc;
+  GetBkColor     : GetBkColorProc;
 
   GraphFreeMemPtr: graphfreememprc;
   GraphGetMemPtr : graphgetmemprc;
@@ -648,7 +685,7 @@ VAR
 
   SaveVideoState : SaveStateProc;
   RestoreVideoState: RestoreStateProc;
-  DrawFlush: FlushProc;
+
 
 type
   TCharsetTransTable = array[Char] of Char;
@@ -721,6 +758,7 @@ procedure GraphDefaults;
 procedure ClearDevice;
 procedure GetViewSettings(var viewport : ViewPortType);
 procedure SetWriteMode(WriteMode : smallint);
+procedure SetWriteModeEx(WriteMode : smallint);
 procedure GetFillSettings(var Fillinfo:Fillsettingstype);
 procedure GetFillPattern(var FillPattern:FillPatternType);
 procedure GetLineSettings(var ActiveLineInfo : LineSettingsType);
@@ -728,8 +766,8 @@ procedure InitGraph(var GraphDriver:smallint;var GraphMode:smallint;const PathTo
 procedure DetectGraph(var GraphDriver:smallint;var GraphMode:smallint);
 function InstallUserDriver(Name: string; AutoDetectPtr: Pointer): smallint;
 function RegisterBGIDriver(driver: pointer): smallint;
-procedure SetFillStyle(Pattern : word; Color: word);
-procedure SetFillPattern(Pattern: FillPatternType; Color: word);
+procedure SetFillStyle(Pattern : word; Color: ColorType);
+procedure SetFillPattern(Pattern: FillPatternType; Color: ColorType);
 Function GetDriverName: string;
  procedure MoveRel(Dx, Dy: smallint);
  procedure MoveTo(X,Y: smallint);
@@ -738,11 +776,9 @@ Function GetDriverName: string;
  function GetDirectVideo: boolean;
 
  { -------------------- Color/Palette ------------------------------- }
- procedure SetBkColor(ColorNum: Word);
- function  GetColor: Word;
- function  GetBkColor: Word;
- procedure SetColor(Color: Word);
- function  GetMaxColor: word;
+ function  GetColor: ColorType;
+ procedure SetColor(Color: ColorType);
+ function  GetMaxColor: ColorType;
 
  procedure SetPalette(ColorNum: word; Color: shortint);
  procedure GetPalette(var Palette: PaletteType);
@@ -758,7 +794,7 @@ Function GetDriverName: string;
  procedure DrawPoly(NumPoints : word;var polypoints);
  procedure LineRel(Dx, Dy: smallint);
  procedure LineTo(X,Y : smallint);
- procedure FloodFill(x : smallint; y : smallint; Border: word);
+ procedure FloodFill(x : smallint; y : smallint; Border: ColorType);
 
  { -------------------- Circle related routines --------------------- }
  procedure GetAspectRatio(var Xasp,Yasp : word);
@@ -784,6 +820,5 @@ Function GetDriverName: string;
  procedure SetUserCharSize(Multx,Divx,Multy,Divy : word);
 
  procedure OutText(const TextString : string);
- 
- procedure DrawFlushDefault;
+
 
