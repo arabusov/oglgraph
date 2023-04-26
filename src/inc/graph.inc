@@ -77,7 +77,12 @@ const
 
 
   { Default font 8x8 system from IBM PC }
-  {$i fontdata.inc}
+  { 866 encoded default font }
+  { $i 866_8x8_fontdata.inc}
+  { $i UniCyr_8x8_fontdata.inc}
+  { $i UniCyr-pln-8x8_fontdata.inc}
+  {$i UniCyrX-pln-8x8_fontdata.inc}
+  { $i Cyr_a8x8_fontdata.inc} // without YE
 
 
 
