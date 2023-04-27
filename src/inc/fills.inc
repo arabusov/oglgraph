@@ -31,10 +31,8 @@ end;
 procedure fillpoly(numpoints : Word; var polypoints);
 
 { disable range check mode }
-{$ifopt R+}
-{$define OPT_R_WAS_ON}
+{$push}
 {$R-}
-{$endif}
 type
   pedge = ^tedge;
   tedge = packed record
@@ -57,6 +55,8 @@ var
 
   ptable : ^pointtype;
 
+  LastPolygonStart : Longint;
+  Closing, PrevClosing : Boolean;
 
 begin
 { /********************************************************************
@@ -74,13 +74,37 @@ begin
  { check for getmem success }
 
   nEdges := 0;
+  LastPolygonStart := 0;
+  Closing := false;
   for i := 0 to (numpoints-1) do begin
     p0 := ptable[i];
     if (i+1) >= numpoints then p1 := ptable[0]
     else p1 := ptable[i+1];
+    { save the 'closing' flag for the previous edge }
+    PrevClosing := Closing;
+    { check if the current edge is 'closing'. This means that it 'closes'
+      the polygon by going back to the first point of the polygon.
+      Also, 0-length edges are never considered 'closing'. }
+    if ((p1.x <> ptable[i].x) or
+        (p1.y <> ptable[i].y)) and
+        (LastPolygonStart < i) and
+       ((p1.x = ptable[LastPolygonStart].x) and
+        (p1.y = ptable[LastPolygonStart].y)) then
+    begin
+      Closing := true;
+      LastPolygonStart := i + 2;
+    end
+    else
+      Closing := false;
+    { skip current edge if the previous edge was 'closing'. This is TP7 compatible }
+    if PrevClosing then
+      continue;
+   { draw the edges }
+{    nickysn: moved after drawing the filled area
+    Line(p0.x,p0.y,p1.x,p1.y);}
    { ignore if this is a horizontal edge}
     if (p0.y = p1.y) then continue;
-    {swap ptable if necessary to ensure p0 contains yMin}
+   { swap ptable if necessary to ensure p0 contains yMin}
     if (p0.y > p1.y) then begin
       p0 := p1;
       p1 := ptable[i];
@@ -165,11 +189,11 @@ begin
     { Fill in desired pixels values on scan line y by using pairs of x
     coordinates from the AET }
     i := 0;
-    while (i < nActive) do begin
+    while (i < (nActive - 1)) do begin
       x0 := AET^[i]^.x;
       x1 := AET^[i+1]^.x;
       {Left edge adjustment for positive fraction.  0 is interior. }
-      if (AET^[i]^.frac > 0) then inc(x0);
+      if (AET^[i]^.frac >= 0) then inc(x0);
       {Right edge adjustment for negative fraction.  0 is exterior. }
       if (AET^[i+1]^.frac <= 0) then dec(x1);
 
@@ -207,10 +231,40 @@ begin
     inc(y);
     if (y >= ViewHeight) then break;
   end;
+
+  { finally, draw the edges }
+  LastPolygonStart := 0;
+  Closing := false;
+  for i := 0 to (numpoints-1) do begin
+    p0 := ptable[i];
+    if (i+1) >= numpoints then p1 := ptable[0]
+    else p1 := ptable[i+1];
+    { save the 'closing' flag for the previous edge }
+    PrevClosing := Closing;
+    { check if the current edge is 'closing'. This means that it 'closes'
+      the polygon by going back to the first point of the polygon.
+      Also, 0-length edges are never considered 'closing'. }
+    if ((p1.x <> p0.x) or
+        (p1.y <> p0.y)) and
+        (LastPolygonStart < i) and
+       ((p1.x = ptable[LastPolygonStart].x) and
+        (p1.y = ptable[LastPolygonStart].y)) then
+    begin
+      Closing := true;
+      LastPolygonStart := i + 2;
+    end
+    else
+      Closing := false;
+    { skip edge if the previous edge was 'closing'. This is TP7 compatible }
+    if PrevClosing then
+      continue;
+   { draw the edges }
+    Line(p0.x,p0.y,p1.x,p1.y);
+  end;
+
   System.freemem(et, sizeof(tedge) * numpoints);
   System.freemem(get, sizeof(pedge) * numpoints);
   System.freemem(aet, sizeof(pedge) * numpoints);
-  DrawFlush;
 end;
 
 
@@ -229,10 +283,11 @@ type
     y  : smallint;
   end;
 
+  PDrawnList  = ^TDrawnList;
   TDrawnList  = Array[0..(MaxYRes - 1) div YResDiv] of PFloodLine;
 
 var
-   DrawnList : TDrawnList;
+   DrawnList : PDrawnList;
    Buffer : Record                         { Union for byte and word addressing of buffer }
      ByteIndex : Word;
      WordIndex : Word;
@@ -242,6 +297,11 @@ var
      End;
 
   s1, s2, s3 : PWordArray;                { Three buffers for scanlines                 }
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+  sl1 : PLongWordArray absolute s1;
+  sl2 : PLongWordArray absolute s2;
+  sl3 : PLongWordArray absolute s3;
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
 
 
   Procedure PushPoint (x, y : smallint);
@@ -298,8 +358,8 @@ var
      temp^.x1 := x1;
      temp^.x2 := x2;
      temp^.y := y;
-     temp^.next := DrawnList[y div YResDiv];
-     DrawnList[y div YResDiv] := temp;
+     temp^.next := DrawnList^[y div YResDiv];
+     DrawnList^[y div YResDiv] := temp;
    end;
 
   {********************************************************}
@@ -319,7 +379,7 @@ var
     temp : PFloodLine;
    begin
     AlreadyDrawn := false;
-    temp := DrawnList[y div YResDiv];
+    temp := DrawnList^[y div YResDiv];
     while assigned(temp) do
       begin
         if (temp^.y = y) and
@@ -341,12 +401,12 @@ var
   {********************************************************}
   Procedure CleanUpDrawnList;
   var
-    l: longint;
+    l: smallint;
     temp1, temp2: PFloodLine;
   begin
-    for l := 0 to high(DrawnList) do
+    for l := 0 to ViewHeight div YResDiv do
       begin
-        temp1 := DrawnList[l];
+        temp1 := DrawnList^[l];
         while assigned(temp1) do
           begin
             temp2 := temp1;
@@ -357,7 +417,7 @@ var
   end;
 
 
-  Procedure FloodFill (x, y : smallint; Border: word);
+  Procedure FloodFill (x, y : smallint; Border: ColorType);
   {********************************************************}
   { Procedure FloodFill()                                  }
   {--------------------------------------------------------}
@@ -371,26 +431,47 @@ var
    Beginx : smallint;
    d, e : Byte;
    Cont : Boolean;
-   BackupColor : Word;
+   BackupColor : ColorType;
    x1, x2, prevy: smallint;
+   SBufferSize, DrawnListSize: SizeUInt;
   Begin
-    FillChar(DrawnList,sizeof(DrawnList),0);
+    If (x<0) Or (y<0) Or
+       (x>ViewWidth) Or (y>ViewHeight) then Exit;
+    DrawnListSize:=sizeof(PFloodLine)*((ViewHeight div YResDiv) + 1);
+    { MaxX is based on zero index }
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+    if MaxColor > 65536 then
+      SBufferSize := (ViewWidth+1)*4   { A pixel color is represented by a longword }
+    else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+      SBufferSize := (ViewWidth+1)*2;  { A pixel color is represented by a word }
+    DrawnList:=nil;
+    s1:=nil;
+    s2:=nil;
+    s3:=nil;
+    GetMem(DrawnList,DrawnListSize);
+    GetMem (s1,SBufferSize);
+    GetMem (s2,SBufferSize);
+    GetMem (s3,SBufferSize);
+    if (not assigned(DrawnList)) or (not assigned(s1)) or (not assigned(s2)) or (not assigned(s3)) then
+      begin
+        _GraphResult := grNoFloodMem;
+        if assigned(s1) then
+          System.FreeMem (s1,SBufferSize);
+        if assigned(s2) then
+          System.FreeMem (s2,SBufferSize);
+        if assigned(s3) then
+          System.FreeMem (s3,SBufferSize);
+        if assigned(DrawnList) then
+          System.FreeMem(DrawnList,DrawnListSize);
+        exit;
+      end;
+    FillChar(DrawnList^,DrawnListSize,0);
     { init prevy }
     prevy := 32767;
     { Save current drawing color }
     BackupColor := CurrentColor;
     CurrentColor := FillSettings.Color;
-    { MaxX is based on zero index }
-    GetMem (s1,(ViewWidth+1)*2);  { A pixel color represents a word }
-    GetMem (s2,(ViewWidth+1)*2);  { A pixel color represents a word }
-    GetMem (s3,(ViewWidth+1)*2);  { A pixel color represents a word }
-    if (not assigned(s1)) or (not assigned(s2)) or (not assigned(s3)) then
-      begin
-        _GraphResult := grNoFloodMem;
-        exit;
-      end;
-    If (x<0) Or (y<0) Or
-       (x>ViewWidth) Or (y>ViewHeight) then Exit;
     { Index of points to check  }
     Buffer.WordIndex:=0;
     PushPoint (x,y);
@@ -429,38 +510,82 @@ var
          end;
        prevy := y;
        { check the current scan line }
-       While (s1^[x]<>Border) And (x<=ViewWidth) Do Inc (x);
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       if MaxColor > 65536 then
+       begin
+         While (sl1^[x]<>Border) And (x<=ViewWidth) Do Inc (x);
+       end
+       else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       begin
+         While (s1^[x]<>Border) And (x<=ViewWidth) Do Inc (x);
+       end;
        d:=0;
        e:=0;
        dec(x);
        Beginx:=x;
-       REPEAT
-         { check the above line }
-         If y<ViewHeight then
-           Begin
-              Cont:=(s3^[x]<>Border) and (not AlreadyDrawn(x,y+1));
-              If (e=0) And Cont then
+{$ifdef FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       if MaxColor > 65536 then
+       begin
+         REPEAT
+           { check the above line }
+           If y<ViewHeight then
+             Begin
+                Cont:=(sl3^[x]<>Border) and (not AlreadyDrawn(x,y+1));
+                If (e=0) And Cont then
+                  Begin
+                    PushPoint (x,y+1);
+                    e:=1;
+                  End
+                Else
+                  If (e=1) And Not Cont then e:=0;
+             End;
+          { check the line below }
+          If (y>0) then
+            Begin
+              Cont:=(sl2^[x]<>Border) and (not AlreadyDrawn(x,y-1));
+              If (d=0) And Cont then
                 Begin
-                  PushPoint (x,y+1);
-                  e:=1;
+                  PushPoint (x,y-1);
+                  d:=1;
                 End
               Else
-                If (e=1) And Not Cont then e:=0;
-           End;
-        { check the line below }
-        If (y>0) then
-          Begin
-            Cont:=(s2^[x]<>Border) and (not AlreadyDrawn(x,y-1));
-            If (d=0) And Cont then
-              Begin
-                PushPoint (x,y-1);
-                d:=1;
-              End
-            Else
-              If (d=1) And Not Cont then d:=0;
-          End;
-        Dec (x);
-       Until (x<0) Or (s1^[x]=Border);
+                If (d=1) And Not Cont then d:=0;
+            End;
+          Dec (x);
+         Until (x<0) Or (sl1^[x]=Border);
+       end
+       else
+{$endif FPC_GRAPH_SUPPORTS_TRUECOLOR}
+       begin
+         REPEAT
+           { check the above line }
+           If y<ViewHeight then
+             Begin
+                Cont:=(s3^[x]<>Border) and (not AlreadyDrawn(x,y+1));
+                If (e=0) And Cont then
+                  Begin
+                    PushPoint (x,y+1);
+                    e:=1;
+                  End
+                Else
+                  If (e=1) And Not Cont then e:=0;
+             End;
+          { check the line below }
+          If (y>0) then
+            Begin
+              Cont:=(s2^[x]<>Border) and (not AlreadyDrawn(x,y-1));
+              If (d=0) And Cont then
+                Begin
+                  PushPoint (x,y-1);
+                  d:=1;
+                End
+              Else
+                If (d=1) And Not Cont then d:=0;
+            End;
+          Dec (x);
+         Until (x<0) Or (s1^[x]=Border);
+       end;
        { swap the values }
        x1:=x+1;
        x2:=BeginX;
@@ -475,15 +600,13 @@ var
        PatternLine (x1,x2,y);
      End; { end while }
 
-    System.FreeMem (s1,(ViewWidth+1)*2);
-    System.FreeMem (s2,(ViewWidth+1)*2);
-    System.FreeMem (s3,(ViewWidth+1)*2);
+    System.FreeMem (s1,SBufferSize);
+    System.FreeMem (s2,SBufferSize);
+    System.FreeMem (s3,SBufferSize);
     CleanUpDrawnList;
+    System.FreeMem(DrawnList,DrawnListSize);
     CurrentColor := BackUpColor;
-    DrawFlush;
   End;
 
 { restore previous range check mode }
-{$ifdef OPT_R_WAS_ON}
-{$R+}
-{$endif}
+{$pop}
