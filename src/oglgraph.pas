@@ -9,7 +9,6 @@ uses gl, glu, sysutils
      {$if defined(unix)}, x, xlib, {glx14}glx, iconvenc{$endif}
 ;
 
-
 const InternalDriverName = 'OpenGLGraph';
 {$i graphh.inc}
 {$if defined(win32)}
@@ -56,13 +55,10 @@ const
   m1280x1024x32k    = $119;
   m1280x1024x64k    = $11A;
 
-
-
 procedure graphSwapBuffers;
 function graphKeyPressed : boolean;
 function graphReadKey : Word;
 procedure SetDoubleBuffer(Enable : boolean);
-
 
 implementation
 
@@ -115,7 +111,6 @@ var
   oldbitmap : hgdiobj;
   MessageThreadHandle : Handle;
   MessageThreadID : DWord;
-
 
 const
   keybuffersize = 32;
@@ -238,15 +233,6 @@ begin
   DeleteCriticalSection(keyboardhandling);
 end;
 
-
-
-
-
-
-
-
-
-
 procedure SetDCPixelFormat (dc: HDC);
 var pfd: TPixelFormatDescriptor;
   nPixelFormat: Integer;
@@ -267,9 +253,6 @@ begin
   nPixelFormat := ChoosePixelFormat (DC,@pfd);
   SetPixelFormat (DC, nPixelFormat,@pfd);
 end;
-
-
-
 
 function WindowProcGraph(Window: HWnd; AMessage:UInt; WParam : WParam;
                          LParam: LParam): Longint;
@@ -343,7 +326,6 @@ begin
 
               end;
 
-
     wm_create:
                begin
 {$ifdef DEBUG_WM_PAINT}
@@ -407,7 +389,6 @@ begin
   end;
 end;
 
-
 function WinRegister: Boolean;
 var
   WindowClass: WndClass;
@@ -431,7 +412,6 @@ begin
 
   winregister := RegisterClass(WindowClass) <> 0;
 end;
-
 
  { Create the Window Class }
 function WinCreate : HWnd;
@@ -486,7 +466,6 @@ begin
   MessageHandleThread := 0;
 end;
 
-
 procedure ogl_InitModeWin32;
 var
   threadexitcode : longint;
@@ -533,7 +512,6 @@ begin
   LeaveCriticalSection(keyboardhandling);
 end;
 
-
 procedure ogl_CloseGraphWin32;
 begin
   if not isgraphmode then
@@ -556,8 +534,6 @@ begin
   isgraphmode := false;
 end;
 
-
-
 procedure ogl_GetScreenResolutionWin32(var Width, Height : Word);
 begin
   Width := GetSystemMetrics(SM_CXSCREEN)-2*GetSystemMetrics(SM_CXFRAME);
@@ -569,10 +545,7 @@ begin
   SwapBuffers(hWinDC);
 end;
 
-
-
 {$endif}
-
 
 {$if defined(unix)}
 var
@@ -1138,7 +1111,6 @@ begin
   end;
 end;
 
-
 procedure ogl_PatternLine(x1,x2,y: smallint);
 begin
   if x1 > x2 then
@@ -1307,7 +1279,6 @@ begin
   SetLogicOp;
   SetLineStyle;
 
-
   glLineStipple (1, $ffff);
   glBegin(GL_LINE_STRIP);
   t := stAngle*PI/180;
@@ -1391,8 +1362,6 @@ begin
       graphInited := true;
     end;
 end;
-
-
 
 function queryadapterinfo : pmodeinfo;
 var
@@ -1654,7 +1623,6 @@ initialization
   exitproc := @myexitproc;
   lastmode := 0;
   {$ENDIF}
-
 
 finalization
   setLength(pal,0);
