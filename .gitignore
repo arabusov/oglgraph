@@ -1,4 +1,6 @@
+lib
 examples/fill
 examples/image_test
 examples/test
-lib
+examples/*.o
+*.bak

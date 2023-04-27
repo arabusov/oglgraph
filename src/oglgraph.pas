@@ -9,7 +9,6 @@ uses gl, glu, sysutils
      {$if defined(unix)}, x, xlib, {glx14}glx, iconvenc{$endif}
 ;
 
-
 const InternalDriverName = 'OpenGLGraph';
 {$i graphh.inc}
 {$if defined(win32)}
@@ -56,15 +55,10 @@ const
   m1280x1024x32k    = $119;
   m1280x1024x64k    = $11A;
 
-
-
 procedure graphSwapBuffers;
 function graphKeyPressed : boolean;
 function graphReadKey : Word;
 procedure SetDoubleBuffer(Enable : boolean);
-//procedure SetPerspectiveDraw(Enable : boolean);
-//procedure SetPerspectiveAttribute(alphaX, alphaY, alphaZ : Single);
-
 
 implementation
 
@@ -90,7 +84,7 @@ var
   OnGraphWindowCreation : procedure  = nil;
 
   GraphWindow,ParentWindow : HWnd;
-  // this allows direct drawing to the window
+  { this allows direct drawing to the window }
   bitmapdc : hdc;
   windc : hdc;
 
@@ -118,7 +112,6 @@ var
   MessageThreadHandle : Handle;
   MessageThreadID : DWord;
 
-
 const
   keybuffersize = 32;
 
@@ -144,8 +137,8 @@ begin
          { skip old chars }
   if nexttoread=nextfree then
     begin
-      // special keys are started by #0
-      // so we've to remove two chars
+        { special keys are started by #0 }
+        { so we've to remove two chars }
       if keybuffer[nexttoread]=#0 then
         inccyclic(nexttoread);
       inccyclic(nexttoread);
@@ -240,15 +233,6 @@ begin
   DeleteCriticalSection(keyboardhandling);
 end;
 
-
-
-
-
-
-
-
-
-
 procedure SetDCPixelFormat (dc: HDC);
 var pfd: TPixelFormatDescriptor;
   nPixelFormat: Integer;
@@ -269,9 +253,6 @@ begin
   nPixelFormat := ChoosePixelFormat (DC,@pfd);
   SetPixelFormat (DC, nPixelFormat,@pfd);
 end;
-
-
-
 
 function WindowProcGraph(Window: HWnd; AMessage:UInt; WParam : WParam;
                          LParam: LParam): Longint;
@@ -345,7 +326,6 @@ begin
 
               end;
 
-
     wm_create:
                begin
 {$ifdef DEBUG_WM_PAINT}
@@ -366,13 +346,13 @@ begin
                  ReleaseDC(window,dc);
                  oldbitmap := SelectObject(bitmapdc,savedscreen);
                  windc := GetDC(window);
-                 // clear everything
+                 { clear everything }
                  oldpen := SelectObject(bitmapdc,GetStockObject(BLACK_PEN));
                  oldbrush := SelectObject(bitmapdc,GetStockObject(BLACK_BRUSH));
                  Windows.Rectangle(bitmapdc,0,0,maxx,maxy);
                  SelectObject(bitmapdc,oldpen);
                  SelectObject(bitmapdc,oldbrush);
-                 // ... the window too
+                 { ... the window too }
                  oldpen := SelectObject(windc,GetStockObject(BLACK_PEN));
                  oldbrush := SelectObject(windc,GetStockObject(BLACK_BRUSH));
                  Windows.Rectangle(windc,0,0,maxx,maxy);
@@ -409,7 +389,6 @@ begin
   end;
 end;
 
-
 function WinRegister: Boolean;
 var
   WindowClass: WndClass;
@@ -433,7 +412,6 @@ begin
 
   winregister := RegisterClass(WindowClass) <> 0;
 end;
-
 
  { Create the Window Class }
 function WinCreate : HWnd;
@@ -488,7 +466,6 @@ begin
   MessageHandleThread := 0;
 end;
 
-
 procedure ogl_InitModeWin32;
 var
   threadexitcode : longint;
@@ -535,7 +512,6 @@ begin
   LeaveCriticalSection(keyboardhandling);
 end;
 
-
 procedure ogl_CloseGraphWin32;
 begin
   if not isgraphmode then
@@ -558,8 +534,6 @@ begin
   isgraphmode := false;
 end;
 
-
-
 procedure ogl_GetScreenResolutionWin32(var Width, Height : Word);
 begin
   Width := GetSystemMetrics(SM_CXSCREEN)-2*GetSystemMetrics(SM_CXFRAME);
@@ -571,10 +545,7 @@ begin
   SwapBuffers(hWinDC);
 end;
 
-
-
 {$endif}
-
 
 {$if defined(unix)}
 var
@@ -587,7 +558,7 @@ procedure ogl_InitModeX;
 var
   event: TXEvent;
   AttribParams: PInteger;
-  //array[0..12] of integer;
+  { array[0..12] of integer; }
   FBConfigs: PGLXFBConfig;
   nelem: integer;
   WM_DELETE_WINDOW: TAtom;
@@ -615,10 +586,10 @@ begin
   AttribParams[1] := GLX_WINDOW_BIT;{GLX_PBUFFER_BIT;}
   AttribParams[2] := GLX_RENDER_TYPE;
   AttribParams[3] := GLX_RGBA_BIT;
-  // Request a double-buffered color buffer with
+  { Request a double-buffered color buffer with }
   AttribParams[4] := GLX_DOUBLEBUFFER;
   AttribParams[5] := 1;
-  // the maximum number of bits per component
+  { the maximum number of bits per component }
   AttribParams[6] := GLX_RED_SIZE;
   AttribParams[7] := 8;
   AttribParams[8] := GLX_GREEN_SIZE;
@@ -658,7 +629,7 @@ begin
         end;
       if myevent._type = ClientMessage then
         begin
-          //writeln('CLOSE WINDOW');
+            { writeln('CLOSE WINDOW'); }
         end;
     end;
 end;
@@ -806,9 +777,11 @@ begin
     end;
   GetPaletteEntry := index;
 end;
-procedure ogl_DrawFlush;
+
+procedure ogl_Flush;
 begin
-  if not Doublebuffer then glFlush;
+  if not Doublebuffer then
+    glFlush
 end;
 
 procedure ogl_DirectPutPixel(X,Y: smallint);
@@ -818,7 +791,7 @@ begin
   glBegin(GL_POINTS);
   glVertex2i(X, MaxY-Y);
   glEnd();
-  if not Doublebuffer then glFlush;
+  ogl_Flush;
 end;
 
 function ogl_GetPixel(X,Y: smallint): word;
@@ -869,17 +842,13 @@ begin
   glBegin(GL_POINTS);
   glVertex2i(X, MaxY-Y);
   glEnd();
-  if not Doublebuffer then glFlush;
+  ogl_Flush
 end;
 procedure ogl_SetRGBPalette(ColorNum, RedValue, GreenValue, BlueValue: smallint);
 begin
-  //    writeln('SetRGBPalette(ColorNum, RedValue, GreenValue, BlueValue: smallint)');
-  //    writeln(format('ColorNum: %d, RedValue: %d, GreenValue: %d, BlueValue: %d',[ColorNum, RedValue, GreenValue, BlueValue]));
   pal[ColorNum].Red := RedValue;
   pal[ColorNum].Green := GreenValue;
   pal[ColorNum].Blue := BlueValue;
-  //    glColor3f(pal[CurrentColor].Red/255, pal[CurrentColor].Green/255, pal[CurrentColor].Blue/255);
-  //    gl_color:=CurrentColor;
 end;
 
 procedure ogl_GetRGBPalette(ColorNum: smallint; var RedValue, GreenValue, BlueValue: smallint);
@@ -894,11 +863,9 @@ begin
 end;
 procedure ogl_SaveVideoState;
 begin
-  //    writeln('SaveVideoState');
 end;
 procedure ogl_RestoreVideoState;
 begin
-  //    writeln('RestoreVideoState');
 end;
 
 
@@ -931,7 +898,7 @@ begin
   glEnable(GL_LOGIC_OP);
   glEnable  (GL_LINE_STIPPLE);
 
-  DrawFlush;
+  ogl_Flush
 end;
 
 procedure ogl_Line(X1, Y1, X2, Y2 : smallint);
@@ -954,8 +921,10 @@ begin
   glVertex2i(X1, MaxY-Y1);
   glVertex2i(X2, MaxY-Y2);
   glEnd();
-  DrawFlush;
+
+  ogl_Flush
 end;
+
 procedure ogl_HLine(x, x2,y : smallint);
 begin
   ogl_Line(x,y,x2,y);
@@ -1147,12 +1116,10 @@ begin
                   end;
     UserFill:
               begin
-                //writeln('UserFill');
                 PatternLineDefault(X1,X2,Y);
               end;
   end;
 end;
-
 
 procedure ogl_PatternLine(x1,x2,y: smallint);
 begin
@@ -1279,14 +1246,14 @@ begin
                   t := y1;
                   while t<=y2 do
                     begin
-                      // вычисляем крайние точки элипса
+                        { find ellipse edge points }
                       x1 := -abs(XRadius*cos(ArcSin(t/YRadius)));
                       x2 := -x1;
-                      // вычисляем границы внутреннего сектора
+                      { find border of the internal sector }
                       if (EndAngle-stAngle>=180) and
                          (((t<=0) and (ArcCall.YStart-Y>=0) and (ArcCall.YEnd-Y>=0)) or
                          ((t>0) and (ArcCall.YStart-Y<=0) and (ArcCall.YEnd-Y<=0))) then
-                        // Вырез находится в другой половине элипса
+                             { cut is placed in another half of the ellipse }
                         ogl_PatternLineShift(round(x1+X), round(x2+X), round(t+Y), round(XRadius-x1))
                       else
                         begin
@@ -1322,7 +1289,6 @@ begin
   SetLogicOp;
   SetLineStyle;
 
-
   glLineStipple (1, $ffff);
   glBegin(GL_LINE_STRIP);
   t := stAngle*PI/180;
@@ -1334,8 +1300,8 @@ begin
   t := EndAngle*PI/180;
   glVertex2f(XRadius * cos(t) + X, YRadius * sin(t) + MaxY - Y);
   glEnd();
-  DrawFlush;
 
+  ogl_Flush
 end;
 
 procedure ogl_Circle(X, Y: smallint; Radius:Word);
@@ -1356,7 +1322,8 @@ begin
       t := t+ PI/n
     end;
   glEnd();
-  DrawFlush;
+
+  ogl_Flush
 end;
 
 procedure ogl_OutTextXY(X, Y: smallint; const text : string);
@@ -1373,7 +1340,7 @@ begin
     s := text;
   OutTextXYDefault(X, Y, s);
   DoubleBuffer := oldDoubleBuffer;
-  if not Doublebuffer then glFlush;
+  ogl_Flush
 end;
 
 procedure ogl_PutImage(X,Y: smallint; var Bitmap; BitBlt: Word);
@@ -1383,12 +1350,12 @@ begin
   DoubleBuffer := true;
   DefaultPutImage(X, Y, Bitmap, BitBlt);
   DoubleBuffer := oldDoubleBuffer;
-  DrawFlush;
+
+  ogl_Flush
 end;
 
 procedure ogl_InitMode;
 begin
-  //    writeln('InitMode');
   if graphInited then
     _graphResult := grError
   else
@@ -1411,8 +1378,6 @@ begin
     end;
 end;
 
-
-
 function queryadapterinfo : pmodeinfo;
 var
   mode: TModeInfo;
@@ -1430,12 +1395,7 @@ begin
       GetRGBPalette  := @ogl_GetRGBPalette;
       SetAllPalette  := @ogl_SetAllPalette;
             { defaults possible ... }
-      //        SetVisualPage  : SetVisualPageProc;
-      //        SetActivePage  : SetActivePageProc;
       ClearViewPort  := @ogl_ClrView;
-      //        PutImage       : PutImageProc;
-      //        GetImage       : GetImageProc;
-      //        ImageSize      : ImageSizeProc;
       GetScanLine    := @ogl_GetScanLine;
       Line           := @ogl_Line;
       InternalEllipse := @ogl_Ellipse;
@@ -1446,7 +1406,6 @@ begin
 
       InitMode       := @ogl_InitMode;
       OutTextXY      := @ogl_OutTextXY;
-      DrawFlush      := @ogl_DrawFlush;
     end;
 end;{DefaultModeParams}
 
@@ -1646,7 +1605,6 @@ end;
 
 procedure CloseGraph;
 begin
-  //    writeln('CloseGraph');
   if graphInited then
     begin
         {$IFDEF WIN32}
@@ -1680,7 +1638,6 @@ initialization
   exitproc := @myexitproc;
   lastmode := 0;
   {$ENDIF}
-
 
 finalization
   setLength(pal,0);
