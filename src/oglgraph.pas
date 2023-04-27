@@ -1406,6 +1406,7 @@ begin
 
       InitMode       := @ogl_InitMode;
       OutTextXY      := @ogl_OutTextXY;
+      DrawFlush      := @ogl_Flush
     end;
 end;{DefaultModeParams}
 
