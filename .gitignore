@@ -1,4 +1,5 @@
 lib
+examples/fill
 examples/image_test
 examples/test
 examples/*.o
