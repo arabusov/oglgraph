@@ -593,6 +593,8 @@ TYPE
 
        OutTextXYProc = procedure(x,y : SmallInt;const TextString : string);
 
+       DrawFlushProc = procedure;
+
        CircleProc = procedure(X, Y: smallint; Radius:Word);
 
        SetBkColorProc = procedure(ColorNum: ColorType);
@@ -648,6 +650,7 @@ TYPE
       Circle         : CircleProc;
       InitMode       : InitModeProc;
       OutTextXY : OutTextXYProc;
+      DrawFlush      : DrawFlushProc;
       SetBKColor     : SetBkColorProc;
       GetBKColor     : GetBkColorProc;
       next: PModeInfo;

@@ -778,6 +778,12 @@ begin
   GetPaletteEntry := index;
 end;
 
+procedure ogl_Flush;
+begin
+  if not Doublebuffer then
+    glFlush
+end;
+
 procedure ogl_DirectPutPixel(X,Y: smallint);
 begin
   SetLogicOp;
@@ -785,7 +791,7 @@ begin
   glBegin(GL_POINTS);
   glVertex2i(X, MaxY-Y);
   glEnd();
-  if not Doublebuffer then glFlush;
+  ogl_Flush;
 end;
 
 function ogl_GetPixel(X,Y: smallint): word;
@@ -836,7 +842,7 @@ begin
   glBegin(GL_POINTS);
   glVertex2i(X, MaxY-Y);
   glEnd();
-  if not Doublebuffer then glFlush;
+  ogl_Flush
 end;
 procedure ogl_SetRGBPalette(ColorNum, RedValue, GreenValue, BlueValue: smallint);
 begin
@@ -892,6 +898,7 @@ begin
   glEnable(GL_LOGIC_OP);
   glEnable  (GL_LINE_STIPPLE);
 
+  ogl_Flush
 end;
 
 procedure ogl_Line(X1, Y1, X2, Y2 : smallint);
@@ -914,7 +921,10 @@ begin
   glVertex2i(X1, MaxY-Y1);
   glVertex2i(X2, MaxY-Y2);
   glEnd();
+
+  ogl_Flush
 end;
+
 procedure ogl_HLine(x, x2,y : smallint);
 begin
   ogl_Line(x,y,x2,y);
@@ -1291,6 +1301,7 @@ begin
   glVertex2f(XRadius * cos(t) + X, YRadius * sin(t) + MaxY - Y);
   glEnd();
 
+  ogl_Flush
 end;
 
 procedure ogl_Circle(X, Y: smallint; Radius:Word);
@@ -1311,6 +1322,8 @@ begin
       t := t+ PI/n
     end;
   glEnd();
+
+  ogl_Flush
 end;
 
 procedure ogl_OutTextXY(X, Y: smallint; const text : string);
@@ -1327,7 +1340,7 @@ begin
     s := text;
   OutTextXYDefault(X, Y, s);
   DoubleBuffer := oldDoubleBuffer;
-  if not Doublebuffer then glFlush;
+  ogl_Flush
 end;
 
 procedure ogl_PutImage(X,Y: smallint; var Bitmap; BitBlt: Word);
@@ -1337,6 +1350,8 @@ begin
   DoubleBuffer := true;
   DefaultPutImage(X, Y, Bitmap, BitBlt);
   DoubleBuffer := oldDoubleBuffer;
+
+  ogl_Flush
 end;
 
 procedure ogl_InitMode;
@@ -1391,6 +1406,7 @@ begin
 
       InitMode       := @ogl_InitMode;
       OutTextXY      := @ogl_OutTextXY;
+      DrawFlush      := @ogl_Flush
     end;
 end;{DefaultModeParams}
 
