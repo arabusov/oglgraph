@@ -881,13 +881,13 @@ begin
 
   if Perspective then
     begin
-      gluPerspective( 0.0 {угол видимости в направлении оси Y},
-                     (MaxX+1) / (MaxY+1) {угол видимости в направлении оси X},
-      1.0 {расстояние от наблюдателя до ближней плоскости отсечения},
-      35.0{расстояние от наблюдателя до дальней плоскости отсечения});
-      glTranslatef (0.0, 0.0, 5.0);{ перенос - ось Z}
-      glRotatef (30.0, 1.0, 0.0, 0.0);{поворот - ось X}
-      glRotatef (60.0, 0.0, 1.0, 0.0); { поворот-ось Y }
+      gluPerspective( 0.0 {visibility angle in the Y axis direction},
+                     (MaxX+1) / (MaxY+1) {visibility angle in the X axis direction},
+      1.0 {distance from an obserer to the nearest clipping plane},
+      35.0{distance of the depth clipping});
+      glTranslatef (0.0, 0.0, 5.0);{ translation along the Z axis}
+      glRotatef (30.0, 1.0, 0.0, 0.0);{ rotation around the X axis}
+      glRotatef (60.0, 0.0, 1.0, 0.0); { rotation around the Y axis }
     end
   else
     glOrtho(0, MaxX, 0, MaxY, 0, 0.1);
