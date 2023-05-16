@@ -3,4 +3,5 @@ examples/fill
 examples/image_test
 examples/test
 examples/*.o
+examples/cube
 *.bak
