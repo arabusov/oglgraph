@@ -9,4 +9,5 @@ fpc  -Fulib examples/test.pas
 fpc  -Fulib examples/image_test.pas
 fpc  -Fulib examples/fill.pas
 fpc  -Fulib examples/cube.pas
+fpc  -Fulib examples/boxstar.pas
 rm examples/*.o
